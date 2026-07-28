@@ -37,12 +37,3 @@ Trained on:
 after replication we have to: (x, y, Re, Phase Angle) vs (x, y)
 
 ----------------------------------------------------------
-
-We will do the setup for the both hydrodynamic and thermal analysis. For the same we need to first define the both sym and asym(+-30, +-60, +-90, 180) channels and then collect the collocation(62k vs 89.6k) and boundary(8k vs 9k) points via Latin Hypercube sampling, as other parameters do not affect the points and their sampling so will use them later, firstly we will have the points for each geometry discussed in paper and then will move forward
-Status: [Collecting]
-
-----------------------------------------------------------
-
-
-
-
