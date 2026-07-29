@@ -23,6 +23,7 @@ import json
 import math
 import os
 import time
+import sys
 import numpy as np
 import pandas as pd
 import torch
@@ -34,6 +35,23 @@ L = 8.0
 a = 1.0
 B = 2.0 * np.pi / L
 H_MIN = 12/7
+
+
+class TeeStream:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+    def isatty(self):
+        return any(getattr(stream, "isatty", lambda: False)() for stream in self.streams)
 
 
 class PINN(nn.Module):
@@ -316,11 +334,10 @@ def continuity_residual(model, xc, yc, n_check=2000):
 # 7. TRAINING LOOP
 # ========================================================================
 def train(args):
-    if args.device == "cuda" and not torch.cuda.is_available():
-        print("[warning] CUDA requested but not available -- falling back to CPU.")
-        device = torch.device("cpu")
-    else:
-        device = torch.device(args.device)
+    device = torch.device("cpu") if args.device == "cuda" and not torch.cuda.is_available() else torch.device(args.device)
+    fallback_warning = None
+    if args.device == "cuda" and device.type == "cpu":
+        fallback_warning = "[warning] CUDA requested but not available -- falling back to CPU."
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -328,6 +345,24 @@ def train(args):
     os.makedirs(args.out_dir, exist_ok=True)
     ckpt_dir = os.path.join(args.out_dir, "checkpoints")
     os.makedirs(ckpt_dir, exist_ok=True)
+    log_path = os.path.join(args.out_dir, "train.log")
+
+    with open(log_path, "a", buffering=1) as log_file:
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        sys.stdout = TeeStream(original_stdout, log_file)
+        sys.stderr = TeeStream(original_stderr, log_file)
+        try:
+            if fallback_warning is not None:
+                print(fallback_warning)
+            return _train_impl(args, device, ckpt_dir, log_file)
+        finally:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+
+
+def _train_impl(args, device, ckpt_dir, log_file):
+    print(f"Logging training output to {os.path.abspath(log_file.name)}")
 
     data = load_dataset(args.geom_dir, device)
     is_inlet, is_wall, is_outlet = make_type_masks(data["types"], device)
