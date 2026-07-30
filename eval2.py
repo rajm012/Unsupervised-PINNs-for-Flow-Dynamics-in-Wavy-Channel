@@ -1,7 +1,7 @@
 
 
 """
-python eval2.py --model_path runs/sym_Re10_beta2/model_final.pt --cfd_data data/eval/cfd_sym.csv --geom_dir data/sym --phi 0 --out_dir eval_sym --Re 10
+python eval2.py --model_path runs/sym_Re10_beta2/model_final.pt --cfd_data data/eval/cfd_sym.csv --geom_dir data/sym --out_dir eval_sym
 """
 
 import argparse
@@ -44,12 +44,12 @@ class PINN(torch.nn.Module):
         return psi, p, sxx, sxy, syy, theta
 
 def velocity_from_psi(model, x, y):
-    """Compute u, v via automatic differentiation."""
     x = x.clone().requires_grad_(True)
     y = y.clone().requires_grad_(True)
     psi, p, sxx, sxy, syy, theta = model(x, y)
-    u = torch.autograd.grad(psi, y, grad_outputs=torch.ones_like(psi), create_graph=False)[0]
-    v = -torch.autograd.grad(psi, x, grad_outputs=torch.ones_like(psi), create_graph=False)[0]
+    grad_psi = torch.autograd.grad(psi, (y, x), grad_outputs=torch.ones_like(psi), create_graph=False)
+    u = grad_psi[0]
+    v = -grad_psi[1]
     return u.detach(), v.detach(), p.detach()
 
 # ----------------------------- Main evaluation -----------------------------------------
@@ -77,14 +77,13 @@ def main(args):
     v_pred = np.zeros(n_points)
     p_pred = np.zeros(n_points)
 
-    with torch.no_grad():
-        for i in range(0, n_points, batch_size):
-            x_batch = torch.tensor(x_cfd[i:i+batch_size], dtype=torch.float32, device=device).view(-1, 1)
-            y_batch = torch.tensor(y_cfd[i:i+batch_size], dtype=torch.float32, device=device).view(-1, 1)
-            u, v, p = velocity_from_psi(model, x_batch, y_batch)
-            u_pred[i:i+batch_size] = u.cpu().numpy().flatten()
-            v_pred[i:i+batch_size] = v.cpu().numpy().flatten()
-            p_pred[i:i+batch_size] = p.cpu().numpy().flatten()
+    for i in range(0, n_points, batch_size):
+        x_batch = torch.tensor(x_cfd[i:i+batch_size], dtype=torch.float32, device=device).view(-1, 1)
+        y_batch = torch.tensor(y_cfd[i:i+batch_size], dtype=torch.float32, device=device).view(-1, 1)
+        u, v, p = velocity_from_psi(model, x_batch, y_batch)
+        u_pred[i:i+batch_size] = u.cpu().numpy().flatten()
+        v_pred[i:i+batch_size] = v.cpu().numpy().flatten()
+        p_pred[i:i+batch_size] = p.cpu().numpy().flatten()
 
     # 4. Compute error metrics
     def compute_errors(pred, true, name):
