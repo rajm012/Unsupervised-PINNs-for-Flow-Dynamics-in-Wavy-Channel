@@ -147,7 +147,7 @@ def generate_boundary_points(N_total, phi=0.0):
     return pts, normals, np.array(labels)
 
 
-def generate_collocation_points(N_total, phi=0.0, bl_thickness_frac=0.15, bl_ratio=0.35, seed=42, max_iter=500):
+def generate_collocation_points(N_total, phi=0.0, bl_thickness_frac=0.15, bl_ratio=0.45, seed=42, max_iter=500):
     """
     Generates internal points using Latin Hypercube Sampling everywhere
     (matching the paper), split into:
