@@ -1,7 +1,7 @@
 
 
 """
-python eval_seek.py --model_path runs/sym_Re10_beta2/model_final.pt --cfd_data data/eval/cfd_sym.csv --geom_dir data/sym --phi 0 --out_dir eval_sym --Re 10
+python eval2.py --model_path runs/sym_Re10_beta2/model_final.pt --cfd_data data/eval/cfd_sym.csv --geom_dir data/sym --phi 0 --out_dir eval_sym --Re 10
 """
 
 import argparse

@@ -8,7 +8,7 @@ reports the same style of comparison the paper uses in Sec. V (Figs. 13-19,
 34): per-field error metrics, parity/scatter plots, and CFD-vs-PINN-vs-error
 contour panels.
 
-python eval_claude.py --checkpoint runs/sym_Re10_beta2/model_final.pt --ref_csv data/eval/cfd_sym.csv --out_dir runs/sym_Re10_beta2/eval
+python eval1.py --checkpoint runs/sym_Re10_beta2/model_final.pt --ref_csv data/eval/cfd_sym.csv --out_dir runs/sym_Re10_beta2/eval
 """
 
 import argparse
