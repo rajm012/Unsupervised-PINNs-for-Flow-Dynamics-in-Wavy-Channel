@@ -20,8 +20,8 @@ pip install numpy pandas pytorch matplot scipy
 
 ## DataSets
 
-**Collocation Points and Boundary Points**: Use the code in the `Scripts/dataUsedGen.py` to generate the same.
-**CFD**: Use the model `model/replicate.mph` to get the points.
+- **Collocation Points and Boundary Points**: Use the code in the `Scripts/dataUsedGen.py` to generate the same.
+- **CFD**: Use the model `model/replicate.mph` to get the points.
 
 ## Current Best
 - `runs/sym_Re10_beta2_patience2k` holds the best replication in `u,v` but we are trying to make it more robust so that we can do the same for the `p,T` too.
@@ -31,5 +31,5 @@ pip install numpy pandas pytorch matplot scipy
 
 
 ## Authors
-*rajm012*
-*rajmyra*
+- *rajm012*
+- *rajmyra*
