@@ -28,7 +28,8 @@ pip install numpy pandas pytorch matplot scipy
 - `python eval1.py --checkpoint runs/sym_Re10_beta2_patience2k/model_final.pt --ref_csv data/eval/cfd_sym.csv --out_dir runs/sym_Re10_beta2_patience2k/eval`: cmd to evaluate the same
 - `python train.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal none --out_dir runs/sym_Re10_beta2_patience2k --batch_size 8192 --beta 2.0`: cmd to train the same
 
-
+## Reference to the pressure's loss terms
+- `https://share.gemini.google/T4jHYQZAHLiK`
 
 ## Authors
 - *rajm012*
