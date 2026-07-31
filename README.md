@@ -32,3 +32,4 @@ pip install numpy pandas pytorch matplot scipy
 
 ## Authors
 *rajm012*
+*rajmyra*
