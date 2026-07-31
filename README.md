@@ -4,6 +4,19 @@
 ## Overview
 Trying to replicate the paper mentioned above. No code or dataset has been provided by authors so it's just hit & try which we have to follow to replicate as many of the hyperparams has not been fully explained by the authors.
 
+## Setup
+- Have a `python` or the `conda` env or create one
+- For `python` env, run the command `pip install Scripts/reqs.txt`
+- For `conda` env, run the command `conda env create -f environment.yml`
+
+This will install the required packages in your envs and then you are good to go for the replication.
+Even if we have any issue then install the below mentioned packages(minimal):
+
+```bash
+pip install numpy pandas pytorch matplot scipy
+```
+
+
 
 ## DataSets
 
@@ -18,4 +31,4 @@ Trying to replicate the paper mentioned above. No code or dataset has been provi
 
 
 ## Authors
-**rajm012**
+*rajm012*
