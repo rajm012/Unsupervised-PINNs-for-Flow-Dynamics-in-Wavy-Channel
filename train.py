@@ -147,7 +147,7 @@ def governing_losses(model, xc, yc, Re, Pr, w_thermal=1.0):
     res5a = sxx + p - (2.0 / Re) * u_x
     res5b = syy + p - (2.0 / Re) * v_y
     res5c = sxy - (1.0 / Re) * (u_y + v_x)
-    Lg5 = torch.mean(res5a ** 2 + res5b ** 2 + res5c ** 2)
+    Lg5 = torch.mean(res5a ** 2 + res5b ** 2 + 2*(res5c ** 2))
 
     Lg = Lg1 + Lg2 + Lg3 + w_thermal * Lg4 + Lg5
     parts = {
