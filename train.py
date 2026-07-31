@@ -464,7 +464,7 @@ def build_argparser():
     p.add_argument("--epochs", type=int, default=20000)
     p.add_argument("--batch_size", type=int, default=0, help="0 = full-batch (as in the paper)")
     p.add_argument("--lr0", type=float, default=1e-3)
-    p.add_argument("--lr_patience", type=int, default=20)
+    p.add_argument("--lr_patience", type=int, default=2000)
     p.add_argument("--lr_gamma", type=float, default=0.8)
     p.add_argument("--lr_min", type=float, default=1e-6)
     p.add_argument("--log_every", type=int, default=10)
