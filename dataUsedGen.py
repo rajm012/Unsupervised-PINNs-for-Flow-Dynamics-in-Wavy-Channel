@@ -1,24 +1,4 @@
 
-"""
-Collocation / boundary point generator for PINN training on the wavy-channel
-geometry described in Roy, Mukherjee, Prasad & Nayak,
-"A computational analysis of flow dynamics and heat transfer in a wavy
-patterned channel using physics-informed neural networks", Phys. Fluids 37,
-043610 (2025).
-
-  * build a dense polyline of the *entire*
-    boundary (top wall + outlet segment + bottom wall + inlet segment),
-    put it in a KD-tree, and classify a candidate point as "boundary
-    layer" using its true nearest-neighbor Euclidean distance to that
-    polyline against a single constant threshold `bl_thickness`. This is
-    a genuine constant-width offset band: it automatically follows wall
-    curvature correctly and rounds the four corners smoothly (no overlap
-    artifacts), matching Fig. 6.
-
-Everything else (LHS everywhere, exact point counts via quota-based
-rejection sampling, boundary labels, analytic outward normals, no
-duplicated corner points) is unchanged from the previous version.
-"""
 
 import numpy as np
 import os
@@ -164,28 +144,107 @@ def generate_boundary_points(N_total, phi=0.0):
     return pts, normals, np.array(labels)
 
 
+# ========================================================================
+# NEW: corner clustering
+# ========================================================================
+def sample_near_corner(cx, cy, n_pts, phi, r_max, r_scale, rng,
+                        max_tries=200, batch_mult=8):
+    """
+    Radially-decaying (exponential) rejection sampling of points clustered
+    around a single corner (cx, cy), kept only if inside the true fluid
+    domain.
 
-def generate_collocation_points(N_total, phi=0.0, bl_thickness=0.25, bl_ratio=0.40, seed=42, max_iter=500, tree_points_per_segment=3000):
+    Because density falls off as ~exp(-r/r_scale) instead of being uniform
+    in area (as plain LHS + distance-filtering gives you), points genuinely
+    pile up and overlap right at r -> 0, i.e. at the corner itself -- this
+    is what produces the dense "blob" you see at the 4 corners in Fig. 6,
+    instead of just a constant-width band.
+    """
+    found = []
+    tries = 0
+    batch = max(n_pts * batch_mult, 4000)
+    while len(found) < n_pts and tries < max_tries:
+        tries += 1
+        r = rng.exponential(scale=r_scale, size=batch)
+        r = r[r <= r_max]
+        theta = rng.uniform(0.0, 2.0 * np.pi, size=r.shape[0])
+        x = cx + r * np.cos(theta)
+        y = cy + r * np.sin(theta)
+
+        # keep only points strictly inside the true fluid domain --
+        # this is what clips the full circle down to just the
+        # interior wedge at each corner, whatever its true angle is.
+        inside = (
+            (x > x_min) & (x < x_max)
+            & (y < y_top(x)) & (y > y_bottom(x, phi))
+        )
+        cand = np.column_stack((x[inside], y[inside]))
+        found.extend(cand.tolist())
+
+    if len(found) < n_pts:
+        print(f"  [warning] corner ({cx:.3f},{cy:.3f}): only {len(found)}/{n_pts} "
+              f"points found in {max_tries} tries -- raise r_max or batch_mult.")
+    return np.array(found[:n_pts]) if found else np.empty((0, 2))
+
+
+def generate_corner_cluster_points(n_total_corner, phi, r_max=0.2545, r_scale=0.045, seed=7):
+    """
+    Builds the 4 corner piles: (x_min, y_top), (x_min, y_bottom),
+    (x_max, y_top), (x_max, y_bottom) -- split evenly.
+
+    r_max    : how far out from the corner the pile extends (keep this
+               <= bl_thickness so the pile sits inside/around the existing
+               boundary-layer band rather than poking into the core).
+    r_scale  : exponential decay length. Smaller -> tighter, denser overlap
+               right at the corner point (this is the main "look" knob).
+    """
+    if n_total_corner <= 0:
+        return np.empty((0, 2))
+
+    rng = np.random.default_rng(seed)
+    corners = [
+        (x_min, y_top(x_min)),
+        (x_min, y_bottom(x_min, phi)),
+        (x_max, y_top(x_max)),
+        (x_max, y_bottom(x_max, phi)),
+    ]
+    n_each = n_total_corner // 4
+    remainder = n_total_corner - n_each * 4
+
+    all_pts = []
+    for i, (cx, cy) in enumerate(corners):
+        n_this = n_each + (1 if i < remainder else 0)
+        pts = sample_near_corner(cx, cy, n_this, phi, r_max, r_scale, rng)
+        all_pts.append(pts)
+    return np.vstack(all_pts)
+
+
+def generate_collocation_points(N_total, phi=0.0, bl_thickness=0.25, bl_ratio=0.40,
+                                 corner_frac=0.18, corner_r_max=0.2545, corner_r_scale=0.045,
+                                 seed=42, max_iter=500, tree_points_per_segment=3000):
     """
     Latin-Hypercube samples the full domain, then splits into:
       - Zone 1 (core): points whose true nearest-boundary distance exceeds
-        `bl_thickness` (a CONSTANT absolute offset -- not scaled by local
-        channel height, since Fig. 6's band is visually constant-width).
-      - Zone 2 (boundary layer): points within `bl_thickness` of the
-        boundary, measured as true 2D Euclidean distance to the nearest
-        point on the full boundary polyline (top/bottom walls + inlet +
-        outlet) -- correctly follows wall curvature and rounds corners.
+        `bl_thickness` (a CONSTANT absolute offset).
+      - Zone 2 (boundary layer band): points within `bl_thickness` of the
+        boundary, true 2D Euclidean distance to the nearest point on the
+        full boundary polyline -- follows wall curvature and rounds corners,
+        but is roughly UNIFORM density along the band.
+      - Zone 3 (corner piles): a `corner_frac` slice carved out of the
+        boundary-layer budget and instead concentrated with an explicit
+        radially-decaying distribution centered on each of the 4 corners,
+        so points genuinely pile up / overlap there -- this is the part the
+        plain distance-band approach can't produce on its own.
 
-    `bl_thickness` is in the same absolute units as x, y (e.g. 0.25 means
-    a band roughly a quarter of a unit-length wide, hugging the wall all
-    the way around). Tune it to match how thick the dense band looks in
-    Fig. 6 relative to the channel's overall size.
+    `bl_thickness` is in the same absolute units as x, y.
     """
     sampler = qmc.LatinHypercube(d=2, seed=seed)
     tree = build_boundary_tree(phi, n_per_segment=tree_points_per_segment)
 
-    n_bl_target = int(N_total * bl_ratio)
-    n_core_target = N_total - n_bl_target
+    n_bl_total_target = int(N_total * bl_ratio)
+    n_corner_target = int(n_bl_total_target * corner_frac)
+    n_bl_target = n_bl_total_target - n_corner_target      # general band budget
+    n_core_target = N_total - n_bl_total_target
 
     core_pts = []
     bl_pts = []
@@ -225,8 +284,14 @@ def generate_collocation_points(N_total, phi=0.0, bl_thickness=0.25, bl_ratio=0.
     core_pts = np.array(core_pts[:n_core_target])
     bl_pts = np.array(bl_pts[:n_bl_target])
 
-    zone_labels = np.array(["core"] * len(core_pts) + ["bl"] * len(bl_pts))
-    all_pts = np.vstack((core_pts, bl_pts))
+    corner_pts = generate_corner_cluster_points(
+        n_corner_target, phi, r_max=corner_r_max, r_scale=corner_r_scale, seed=seed + 1
+    )
+
+    zone_labels = np.array(
+        ["core"] * len(core_pts) + ["bl"] * len(bl_pts) + ["corner"] * len(corner_pts)
+    )
+    all_pts = np.vstack((core_pts, bl_pts, corner_pts))
     return all_pts, zone_labels
 
 
@@ -257,6 +322,7 @@ if __name__ == "__main__":
     phis_deg = [0, 30, 60, 90, 180, -30, -60, -90]
     labels = ["sym" if p == 0 else f"phi_{p}" for p in phis_deg]
 
+ 
     out_dir = "points"
     os.makedirs(out_dir, exist_ok=True)
     plot_geometry_check(phis_deg, out_dir)
@@ -294,10 +360,14 @@ if __name__ == "__main__":
         colloc_f = colloc.astype(float)
         plt.figure(figsize=(10, 6))
         is_core = zone_labels == "core"
+        is_bl = zone_labels == "bl"
+        is_corner = zone_labels == "corner"
         plt.scatter(colloc_f[is_core][::5, 0], colloc_f[is_core][::5, 1],
                     s=0.5, c="g", alpha=0.4, label="core (subsampled)")
-        plt.scatter(colloc_f[~is_core][::2, 0], colloc_f[~is_core][::2, 1],
+        plt.scatter(colloc_f[is_bl][::2, 0], colloc_f[is_bl][::2, 1],
                     s=0.5, c="g", alpha=0.5, label="boundary layer (subsampled)")
+        plt.scatter(colloc_f[is_corner][:, 0], colloc_f[is_corner][:, 1],
+                    s=0.5, c="g", alpha=0.6, label="corner piles")
         boundary_f = boundary.astype(float)
         plt.scatter(boundary_f[:, 0], boundary_f[:, 1], s=2, c="r", label="boundary")
         plt.title(f"Channel Geometry: {label}")
@@ -308,4 +378,3 @@ if __name__ == "__main__":
         plt.close()
 
     print("All point sets generated successfully!")
-
