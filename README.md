@@ -22,11 +22,13 @@ pip install numpy pandas pytorch matplot scipy
 
 - **Collocation Points and Boundary Points**: Use the code in the `Scripts/dataUsedGen.py` to generate the same.
 - **CFD**: Use the model `model/replicate.mph` to get the points.
+- For now we are using the `points/` as our data.
 
 ## Current Best
-- `runs/sym_Re10_beta2_patience2k` holds the best replication in `u,v` but we are trying to make it more robust so that we can do the same for the `p,T` too.
-- `python eval1.py --checkpoint runs/sym_Re10_beta2_patience2k/model_final.pt --ref_csv data/eval/cfd_sym.csv --out_dir runs/sym_Re10_beta2_patience2k/eval`: cmd to evaluate the same
-- `python train.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal none --out_dir runs/sym_Re10_beta2_patience2k --batch_size 8192 --beta 2.0`: cmd to train the same
+- `runs/sym_Re10_beta2_patience05` holds the best replication in `u,v` but we are trying to make it more robust so that we can do the same for the `p,T` too.
+- `python eval1.py --checkpoint runs/sym_Re10_beta2_patience05/model_final.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_Re10_beta2_patience05/eval`: cmd to evaluate the same
+- `python train.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal none --out_dir runs/sym_Re10_beta2_patience05 --batch_size 8192 --beta 2.0`: cmd to train the same
+- *plz don't have a look over the test_only as it has outdated results.*
 
 ## Reference to the pressure's loss terms
 - `https://share.gemini.google/T4jHYQZAHLiK`
