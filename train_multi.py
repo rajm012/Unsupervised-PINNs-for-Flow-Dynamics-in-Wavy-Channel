@@ -12,22 +12,22 @@ import shlex
 
 
 geom_dirs = [
-    "points/phi_-30",
-    "points/phi_-60",
-    "points/phi_-90",
-    "points/phi_30",
-    "points/phi_60",
-    "points/phi_90",
+    # "points/phi_-30",
+    # "points/phi_-60",
+    # "points/phi_-90",
+    # "points/phi_30",
+    # "points/phi_60",
+    # "points/phi_90",
     "points/phi_180"
 ]
 
 out_dirs = [
-    "runs/phi_-30",
-    "runs/phi_-60",
-    "runs/phi_-90",
-    "runs/phi_30",
-    "runs/phi_60",
-    "runs/phi_90",
+    # "runs/phi_-30",
+    # "runs/phi_-60",
+    # "runs/phi_-90",
+    # "runs/phi_30",
+    # "runs/phi_60",
+    # "runs/phi_90",
     "runs/phi_180"
 ]
 
