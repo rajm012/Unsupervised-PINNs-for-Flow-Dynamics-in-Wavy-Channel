@@ -380,6 +380,8 @@ def _train_impl(args, device, ckpt_dir, log_file):
 
     history = []
     t0 = time.time()
+    best_loss = float('inf')
+    best_epoch = 0
 
     for epoch in range(1, args.epochs + 1):
         if args.batch_size and args.batch_size < xc.shape[0]:
@@ -397,10 +399,24 @@ def _train_impl(args, device, ckpt_dir, log_file):
             thermal_mode=args.thermal, w_thermal=w_thermal,
         )
         Lp = Lg + args.beta * LBC  # Eq. (27)
+        Lp_value = Lp.item()
 
         Lp.backward()
         optimizer.step()
-        scheduler.step(Lp.item())
+        scheduler.step(Lp_value)
+        
+        if Lp_value < best_loss:
+            best_loss = Lp_value
+            best_epoch = epoch
+            # torch.save(
+            #     {"epoch": epoch, "model_state": model.state_dict(),
+            #      "optimizer_state": optimizer.state_dict(), "args": vars(args),
+            #      "best_loss": best_loss},
+            #      os.path.join(ckpt_dir, f"best_{epoch:06d}.pt"),
+            #     )
+            
+            torch.save(model.state_dict(), os.path.join(args.out_dir, f'model_best.pt'))
+            print(f"[{epoch:6d}] New best model! with Loss= {best_loss:.4e}")
 
         if epoch % args.log_every == 0 or epoch == 1:
             row = {
