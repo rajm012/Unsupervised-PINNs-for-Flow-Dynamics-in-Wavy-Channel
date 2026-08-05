@@ -1,0 +1,144 @@
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience300_beta0.25/model_best.pt -> output: runs/sym_multi/sym_patience300_beta0.25/eval_best =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience300_beta0.25/model_best.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience300_beta0.25/eval_best
+Loaded model (6 x 100) from runs/sym_multi/sym_patience300_beta0.25/model_best.pt
+{
+  "u_MAE": 0.029863202573377906,
+  "u_RMSE": 0.04626665183928353,
+  "u_max_abs_err": 0.5880173444747925,
+  "u_rel_L2_err": 0.09318109234834807,
+  "v_MAE": 0.012899202004921013,
+  "v_RMSE": 0.019407149636310857,
+  "v_max_abs_err": 0.332069938479974,
+  "v_rel_L2_err": 0.2809940292578233,
+  "p_MAE": 0.25656272939336777,
+  "p_RMSE": 0.5950860725081186,
+  "p_max_abs_err": 32.83907338221559,
+  "p_rel_L2_err": 0.49982696259015236,
+  "speed_MAE": 0.03153755111590098,
+  "speed_RMSE": 0.047720760236683084,
+  "speed_max_abs_err": 0.5998862805363459,
+  "speed_rel_L2_err": 0.0951931549677452
+}
+Done. Outputs written to runs/sym_multi/sym_patience300_beta0.25/eval_best
+Finished runs/sym_multi/sym_patience300_beta0.25/model_best.pt successfully.
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience500_beta0.25/model_best.pt -> output: runs/sym_multi/sym_patience500_beta0.25/eval_best =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience500_beta0.25/model_best.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience500_beta0.25/eval_best
+Loaded model (6 x 100) from runs/sym_multi/sym_patience500_beta0.25/model_best.pt
+{
+  "u_MAE": 0.03057563005435579,
+  "u_RMSE": 0.04747458776297291,
+  "u_max_abs_err": 0.5982997417449951,
+  "u_rel_L2_err": 0.09561387674880946,
+  "v_MAE": 0.013022385459211598,
+  "v_RMSE": 0.019919551381119654,
+  "v_max_abs_err": 0.34082725533661906,
+  "v_rel_L2_err": 0.28841303893058695,
+  "p_MAE": 0.26870441266760203,
+  "p_RMSE": 0.6039683858380139,
+  "p_max_abs_err": 32.99903055270204,
+  "p_rel_L2_err": 0.5072874290630843,
+  "speed_MAE": 0.03225134765416695,
+  "speed_RMSE": 0.04895555794499777,
+  "speed_max_abs_err": 0.6104221579614367,
+  "speed_rel_L2_err": 0.09765632380701823
+}
+Done. Outputs written to runs/sym_multi/sym_patience500_beta0.25/eval_best
+Finished runs/sym_multi/sym_patience500_beta0.25/model_best.pt successfully.
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience200_beta0.25/model_best.pt -> output: runs/sym_multi/sym_patience200_beta0.25/eval_best =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience200_beta0.25/model_best.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience200_beta0.25/eval_best
+Loaded model (6 x 100) from runs/sym_multi/sym_patience200_beta0.25/model_best.pt
+{
+  "u_MAE": 0.03531615099007665,
+  "u_RMSE": 0.054288539034484835,
+  "u_max_abs_err": 0.5884270071983337,
+  "u_rel_L2_err": 0.1093371827899178,
+  "v_MAE": 0.015472105022691033,
+  "v_RMSE": 0.022124442302990207,
+  "v_max_abs_err": 0.3393406998962677,
+  "v_rel_L2_err": 0.32033741710156793,
+  "p_MAE": 0.30323408267597834,
+  "p_RMSE": 0.6195433379690083,
+  "p_max_abs_err": 32.97958847125062,
+  "p_rel_L2_err": 0.5203692022313108,
+  "speed_MAE": 0.03723362133474071,
+  "speed_RMSE": 0.0560168424784131,
+  "speed_max_abs_err": 0.6012075783560037,
+  "speed_rel_L2_err": 0.11174214200284899
+}
+Done. Outputs written to runs/sym_multi/sym_patience200_beta0.25/eval_best
+Finished runs/sym_multi/sym_patience200_beta0.25/model_best.pt successfully.
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience300_beta0.25/model_final.pt -> output: runs/sym_multi/sym_patience300_beta0.25/eval =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience300_beta0.25/model_final.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience300_beta0.25/eval
+Loaded model (6 x 100) from runs/sym_multi/sym_patience300_beta0.25/model_final.pt
+{
+  "u_MAE": 0.029974222286715542,
+  "u_RMSE": 0.046353858213804035,
+  "u_max_abs_err": 0.5837427377700806,
+  "u_rel_L2_err": 0.09335672609132532,
+  "v_MAE": 0.012833929999192436,
+  "v_RMSE": 0.01936922738940926,
+  "v_max_abs_err": 0.3324542780770502,
+  "v_rel_L2_err": 0.2804449571295055,
+  "p_MAE": 0.25646033035841753,
+  "p_RMSE": 0.5947320322117241,
+  "p_max_abs_err": 32.82632752497682,
+  "p_rel_L2_err": 0.499529595714743,
+  "speed_MAE": 0.031604157874224034,
+  "speed_RMSE": 0.047804527665983074,
+  "speed_max_abs_err": 0.5961038529116157,
+  "speed_rel_L2_err": 0.09536025385382864
+}
+Done. Outputs written to runs/sym_multi/sym_patience300_beta0.25/eval
+Finished runs/sym_multi/sym_patience300_beta0.25/model_final.pt successfully.
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience500_beta0.25/model_final.pt -> output: runs/sym_multi/sym_patience500_beta0.25/eval =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience500_beta0.25/model_final.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience500_beta0.25/eval
+Loaded model (6 x 100) from runs/sym_multi/sym_patience500_beta0.25/model_final.pt
+{
+  "u_MAE": 0.030453492233220386,
+  "u_RMSE": 0.04687618716705138,
+  "u_max_abs_err": 0.619417130947113,
+  "u_rel_L2_err": 0.09440869723023172,
+  "v_MAE": 0.012424799442839668,
+  "v_RMSE": 0.019412597950915735,
+  "v_max_abs_err": 0.3373411383377901,
+  "v_rel_L2_err": 0.28107291481815433,
+  "p_MAE": 0.26134887041266086,
+  "p_RMSE": 0.600415330205503,
+  "p_max_abs_err": 32.98293515284547,
+  "p_rel_L2_err": 0.5043031330313746,
+  "speed_MAE": 0.031821532979402746,
+  "speed_RMSE": 0.0482294971941398,
+  "speed_max_abs_err": 0.6298308113379112,
+  "speed_rel_L2_err": 0.09620798113121797
+}
+Done. Outputs written to runs/sym_multi/sym_patience500_beta0.25/eval
+Finished runs/sym_multi/sym_patience500_beta0.25/model_final.pt successfully.
+
+===== Evaluating checkpoint: runs/sym_multi/sym_patience200_beta0.25/model_final.pt -> output: runs/sym_multi/sym_patience200_beta0.25/eval =====
+Executing: /home/rajm012/miniconda3/bin/python3 eval1.py --hidden_layers 6 --hidden_units 100 --batch_size 16384 --device cuda --checkpoint runs/sym_multi/sym_patience200_beta0.25/model_final.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/sym_multi/sym_patience200_beta0.25/eval
+Loaded model (6 x 100) from runs/sym_multi/sym_patience200_beta0.25/model_final.pt
+{
+  "u_MAE": 0.03518083143669084,
+  "u_RMSE": 0.05413083721969054,
+  "u_max_abs_err": 0.5882027745246887,
+  "u_rel_L2_err": 0.10901957114559795,
+  "v_MAE": 0.015422447902620064,
+  "v_RMSE": 0.022082246932033384,
+  "v_max_abs_err": 0.33870105614332024,
+  "v_rel_L2_err": 0.31972647487030886,
+  "p_MAE": 0.30222765899313486,
+  "p_RMSE": 0.6188881953092381,
+  "p_max_abs_err": 32.97238250811586,
+  "p_rel_L2_err": 0.5198189323110015,
+  "speed_MAE": 0.037109118843539,
+  "speed_RMSE": 0.055862258822597266,
+  "speed_max_abs_err": 0.6008084537167525,
+  "speed_rel_L2_err": 0.11143377923095323
+}
+Done. Outputs written to runs/sym_multi/sym_patience200_beta0.25/eval
+Finished runs/sym_multi/sym_patience200_beta0.25/model_final.pt successfully.
