@@ -117,10 +117,10 @@ geom_dirs = [
 
 base_out_dir = "runs/sym_multi"
 # beta_values = [1.0, 0.5, 0.1, 0.25]
-# patience_values = [300, 200, 500]
+patience_values = [300, 200, 500]
 
-patience_values=[500]
-beta_values=[0.1]
+# patience_values=[500]
+beta_values=[0.25]
 
 Re = 10.0
 Pr = 0.7

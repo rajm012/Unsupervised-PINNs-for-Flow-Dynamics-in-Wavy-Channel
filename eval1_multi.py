@@ -14,33 +14,48 @@ import shlex
 eval_script = "eval1.py"
 
 checkpoints = [
-    "runs/phi_-30/model_final.pt",
-    "runs/phi_-60/model_final.pt",
-    "runs/phi_-90/model_final.pt",
-    "runs/phi_30/model_final.pt",
-    "runs/phi_60/model_final.pt",
-    "runs/phi_90/model_final.pt",
-    "runs/phi_180/model_final.pt"
+    "runs/sym_multi/sym_beta0p5_patience300/model_best.pt",
+    "runs/sym_multi/sym_beta0p5_patience500/model_best.pt",
+    "runs/sym_multi/sym_beta0p5_patience100/model_best.pt",
+    "runs/sym_multi/sym_patience200_beta0.5/model_best.pt",
+    "runs/sym_multi/sym_patience300_beta0.5/model_best.pt",
+    "runs/sym_multi/sym_patience500_beta0.5/model_best.pt",
+    "runs/sym_multi/sym_patience500_beta1.0/model_best.pt",
+    "runs/sym_multi/sym_patience200_beta1.0/model_best.pt",
+    "runs/sym_multi/sym_patience300_beta1.0/model_best.pt",
+    "runs/sym_multi/sym_patience300_beta0.1/model_best.pt",
+    "runs/sym_multi/sym_patience500_beta0.1/model_best.pt",
+    "runs/sym_multi/sym_patience200_beta0.1/model_best.pt"
 ]
 
 ref_csvs = [
-    "eval_data/cfd_m30.csv",
-    "eval_data/cfd_m60.csv",
-    "eval_data/cfd_m90.csv",
-    "eval_data/cfd_30.csv",
-    "eval_data/cfd_60.csv",
-    "eval_data/cfd_90.csv",
-    "eval_data/cfd_180.csv"
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv",
+    "eval_data/cfd_sym.csv"
 ]
 
 out_dirs = [
-    "runs/phi_-30/eval",
-    "runs/phi_-60/eval",
-    "runs/phi_-90/eval",
-    "runs/phi_30/eval",
-    "runs/phi_60/eval",
-    "runs/phi_90/eval",
-    "runs/phi_180/eval"
+    "runs/sym_multi/sym_beta0p5_patience300/eval_best",
+    "runs/sym_multi/sym_beta0p5_patience500/eval_best",
+    "runs/sym_multi/sym_beta0p5_patience100/eval_best",
+    "runs/sym_multi/sym_patience200_beta0.5/eval_best",
+    "runs/sym_multi/sym_patience300_beta0.5/eval_best",
+    "runs/sym_multi/sym_patience500_beta0.5/eval_best",
+    "runs/sym_multi/sym_patience500_beta1.0/eval_best",
+    "runs/sym_multi/sym_patience200_beta1.0/eval_best",
+    "runs/sym_multi/sym_patience300_beta1.0/eval_best",
+    "runs/sym_multi/sym_patience300_beta0.1/eval_best",
+    "runs/sym_multi/sym_patience500_beta0.1/eval_best",
+    "runs/sym_multi/sym_patience200_beta0.1/eval_best"
 ]
 
 hidden_layers = 6
