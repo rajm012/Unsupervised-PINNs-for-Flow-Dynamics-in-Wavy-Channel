@@ -381,7 +381,7 @@ def _train_impl(args, device, ckpt_dir, log_file):
     history = []
     t0 = time.time()
     best_loss = float('inf')
-    best_epoch = 0
+    beta = args.beta 
 
     for epoch in range(1, args.epochs + 1):
         if args.batch_size and args.batch_size < xc.shape[0]:
@@ -398,6 +398,38 @@ def _train_impl(args, device, ckpt_dir, log_file):
             theta_wall_target, args.Re, args.Pr,
             thermal_mode=args.thermal, w_thermal=w_thermal,
         )
+
+        # --- GradNorm Adaptive Beta Logic ---
+        if args.adaptive_beta:
+            with torch.no_grad():
+                # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
+                shared_params = list(model.net[-1].parameters())
+                grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
+                grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+
+                grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
+                grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
+                
+                # 2. Calculate average gradient norm and average loss
+                avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
+                avg_loss = (Lg.item() + LBC.item()) / 2.0
+                
+                # 3. Calculate the Target Gradient Norm for the BC term
+                # A higher alpha forces the gradients to match more strictly
+                alpha = args.gradnorm_alpha
+                target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
+                
+                # 4. Compute the target beta required to achieve this gradient norm
+                target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
+                
+                # 5. Smoothly update beta via Exponential Moving Average (EMA)
+                beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
+                
+                # 6. Clamp beta to a sensible range to prevent exploding values
+                beta = max(args.beta_min, min(args.beta_max, beta))
+                print(f"Beta for the epoch {epoch} is {beta}")
+
+
         Lp = Lg + args.beta * LBC  # Eq. (27)
         Lp_value = Lp.item()
 
@@ -407,14 +439,6 @@ def _train_impl(args, device, ckpt_dir, log_file):
         
         if Lp_value < best_loss:
             best_loss = Lp_value
-            best_epoch = epoch
-            # torch.save(
-            #     {"epoch": epoch, "model_state": model.state_dict(),
-            #      "optimizer_state": optimizer.state_dict(), "args": vars(args),
-            #      "best_loss": best_loss},
-            #      os.path.join(ckpt_dir, f"best_{epoch:06d}.pt"),
-            #     )
-            
             torch.save(model.state_dict(), os.path.join(args.out_dir, f'model_best.pt'))
             print(f"[{epoch:6d}] New best model! with Loss= {best_loss:.4e}")
 
@@ -471,16 +495,14 @@ def build_argparser():
     p.add_argument("--geom_dir", type=str, required=True, help="Path to one geometry folder, e.g. data/phi_60")
     p.add_argument("--Re", type=float, required=True, help="Reynolds number")
     p.add_argument("--Pr", type=float, default=0.7, help="Prandtl number")
-    p.add_argument("--thermal", type=str, default="homogeneous",
-                    choices=["none", "homogeneous", "nonhomogeneous"],
-                    help="Thermal BC mode (Sec. V.B.1 / V.B.2, or 'none' for hydrodynamics-only)")
+    p.add_argument("--thermal", type=str, default="homogeneous", choices=["none", "homogeneous", "nonhomogeneous"], help="Thermal BC mode (Sec. V.B.1 / V.B.2, or 'none' for hydrodynamics-only)")
     p.add_argument("--hidden_layers", type=int, default=6, help="Table I: 6 for wavy, 5 for plane")
     p.add_argument("--hidden_units", type=int, default=100, help="Table I: 100 for wavy, 80 for plane")
     p.add_argument("--beta", type=float, default=10.0, help="Boundary-loss weight (Eq. 27)")
     p.add_argument("--epochs", type=int, default=20000)
-    p.add_argument("--batch_size", type=int, default=0, help="0 = full-batch (as in the paper)")
+    p.add_argument("--batch_size", type=int, default=16384, help="0 = full-batch (as in the paper)")
     p.add_argument("--lr0", type=float, default=1e-3)
-    p.add_argument("--lr_patience", type=int, default=2000)
+    p.add_argument("--lr_patience", type=int, default=300)
     p.add_argument("--lr_gamma", type=float, default=0.8)
     p.add_argument("--lr_min", type=float, default=1e-6)
     p.add_argument("--log_every", type=int, default=10)
@@ -488,6 +510,11 @@ def build_argparser():
     p.add_argument("--device", type=str, default="cuda")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out_dir", type=str, default="runs/default")
+    p.add_argument("--adaptive_beta", action="store_true", help="Enable GradNorm adaptive weighting for beta")
+    p.add_argument("--gradnorm_alpha", type=float, default=0.5, help="GradNorm alpha. 0.5-1.0. Controls sensitivity to loss change rates.")
+    p.add_argument("--gradnorm_lr", type=float, default=0.05, help="EMA smoothing rate for updating beta in GradNorm. Default 0.05.")
+    p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
+    p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
     return p
 
 

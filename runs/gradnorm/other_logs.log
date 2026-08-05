@@ -1,0 +1,7 @@
+
+python train.py --geom_dir points/sym --Re 10 --Pr 0.7 --thermal none --epochs 20000 --hidden_layers 6 --hidden_units 100 --adaptive_beta --gradnorm_alpha 0.5 --gradnorm_lr 0.05 --beta_min 0.01 --beta_max 100.0 --out_dir runs/gradnorm
+
+python eval1.py --checkpoint runs/gradnorm/model_final.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/gradnorm/eval
+
+python eval1.py --checkpoint runs/gradnorm/model_best.pt --ref_csv eval_data/cfd_sym.csv --out_dir runs/gradnorm/eval_best
+
