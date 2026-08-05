@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PINN Hyperparameter Comparison</title>
+<style>
+
+body{
+    font-family: "Segoe UI",Arial,sans-serif;
+    background:#eef2f7;
+    margin:40px;
+}
+
+h1{
+    text-align:center;
+    color:#1f2937;
+    margin-bottom:30px;
+}
+
+table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:10px;
+}
+
+th{
+    background:#1e3a8a;
+    color:white;
+    padding:16px;
+    font-size:18px;
+    border-radius:10px;
+}
+
+.row-head{
+    background:#2563eb;
+    color:white;
+    width:120px;
+}
+
+td{
+    background:white;
+    border-radius:12px;
+    padding:15px;
+    vertical-align:top;
+    box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    transition:.2s;
+}
+
+td:hover{
+    transform:translateY(-3px);
+    box-shadow:0 8px 20px rgba(0,0,0,.15);
+}
+
+.metric{
+    display:flex;
+    justify-content:space-between;
+    padding:4px 0;
+    border-bottom:1px solid #ececec;
+}
+
+.metric:last-child{
+    border-bottom:none;
+}
+
+.metric span:first-child{
+    font-weight:600;
+    color:#374151;
+}
+
+.metric span:last-child{
+    font-family:Consolas,monospace;
+    color:#0f766e;
+}
+
+.missing{
+    color:#dc2626;
+    text-align:center;
+    font-weight:bold;
+    font-size:18px;
+}
+
+</style>
+</head>
+<body>
+
+<h1>Patience vs Beta</h1>
+
+<table>
+
+<tr>
+    <th>β ↓ / Patience →</th>
+    <th>200</th>
+    <th>300</th>
+    <th>500</th>
+</tr>
+
+<tr>
+
+<th class="row-head">0.10</th>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.1210e-03</span></div>
+<div class="metric"><span>Lp</span><span>1.1251e-03</span></div>
+<div class="metric"><span>Lg</span><span>1.7906e-04</span></div>
+<div class="metric"><span>LBC</span><span>9.4600e-03</span></div>
+<div class="metric"><span>LR</span><span>6.8700e-05</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.0264e-3</span></div>
+<div class="metric"><span>Lp</span><span>1.0284e-3</span></div>
+<div class="metric"><span>Lg</span><span>1.4933e-4</span></div>
+<div class="metric"><span>LBC</span><span>8.7902e-3</span></div>
+<div class="metric"><span>LR</span><span>1.3400e-4</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.0631e-3</span></div>
+<div class="metric"><span>Lp</span><span>1.1204e-3</span></div>
+<div class="metric"><span>Lg</span><span>1.9781e-4</span></div>
+<div class="metric"><span>LBC</span><span>9.2264e-3</span></div>
+<div class="metric"><span>LR</span><span>3.2800e-4</span></div>
+</td>
+
+</tr>
+
+<tr>
+
+<th class="row-head">0.25</th>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.9809e-3</span></div>
+<div class="metric"><span>Lp</span><span>1.9998e-3</span></div>
+<div class="metric"><span>Lg</span><span>3.2111e-4</span></div>
+<div class="metric"><span>LBC</span><span>6.7149e-3</span></div>
+<div class="metric"><span>LR</span><span>1.8000e-5</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.8786e-3</span></div>
+<div class="metric"><span>Lp</span><span>1.8881e-3</span></div>
+<div class="metric"><span>Lg</span><span>2.8071e-4</span></div>
+<div class="metric"><span>LBC</span><span>6.4294e-3</span></div>
+<div class="metric"><span>LR</span><span>1.3400e-4</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>1.9662e-3</span></div>
+<div class="metric"><span>Lp</span><span>2.5483e-3</span></div>
+<div class="metric"><span>Lg</span><span>7.2150e-4</span></div>
+<div class="metric"><span>LBC</span><span>7.3074e-3</span></div>
+<div class="metric"><span>LR</span><span>4.1000e-4</span></div>
+</td>
+
+</tr>
+
+<tr>
+
+<th class="row-head">0.50</th>
+
+<td>
+<div class="metric"><span>Lp</span><span>3.1638e-3</span></div>
+<div class="metric"><span>Lp</span><span>3.2060e-3</span></div>
+<div class="metric"><span>Lg</span><span>5.1633e-4</span></div>
+<div class="metric"><span>LBC</span><span>5.3787e-3</span></div>
+<div class="metric"><span>LR</span><span>3.7800e-6</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>2.9900e-3</span></div>
+<div class="metric"><span>Lp</span><span>3.0250e-3</span></div>
+<div class="metric"><span>Lg</span><span>4.6100e-4</span></div>
+<div class="metric"><span>LBC</span><span>5.1300e-3</span></div>
+<div class="metric"><span>LR</span><span>1.0700e-4</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>3.0069e-3</span></div>
+<div class="metric"><span>Lp</span><span>3.1940e-3</span></div>
+<div class="metric"><span>Lg</span><span>5.2940e-4</span></div>
+<div class="metric"><span>LBC</span><span>5.3287e-3</span></div>
+<div class="metric"><span>LR</span><span>2.6200e-4</span></div>
+</td>
+
+</tr>
+
+<tr>
+
+<th class="row-head">1.00</th>
+
+<td>
+<div class="metric"><span>Lp</span><span>5.2718e-3</span></div>
+<div class="metric"><span>Lp</span><span>5.3818e-3</span></div>
+<div class="metric"><span>Lg</span><span>9.1287e-4</span></div>
+<div class="metric"><span>LBC</span><span>4.4689e-3</span></div>
+<div class="metric"><span>LR</span><span>9.2200e-6</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>5.0213e-3</span></div>
+<div class="metric"><span>Lp</span><span>5.1102e-3</span></div>
+<div class="metric"><span>Lg</span><span>8.0993e-4</span></div>
+<div class="metric"><span>LBC</span><span>4.3003e-3</span></div>
+<div class="metric"><span>LR</span><span>1.0700e-4</span></div>
+</td>
+
+<td>
+<div class="metric"><span>Lp</span><span>5.4573e-3</span></div>
+<div class="metric"><span>Lp</span><span>5.5198e-3</span></div>
+<div class="metric"><span>Lg</span><span>8.3162e-4</span></div>
+<div class="metric"><span>LBC</span><span>4.6882e-3</span></div>
+<div class="metric"><span>LR</span><span>4.1000e-4</span></div>
+</td>
+
+</tr>
+
+</table>
+
+</body>
+</html>
