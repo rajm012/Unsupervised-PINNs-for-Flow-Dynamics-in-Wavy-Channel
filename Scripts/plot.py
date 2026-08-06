@@ -2,7 +2,7 @@ import re
 import matplotlib.pyplot as plt
 
 # Path to your log file
-log_file = "runs/gradnorm/train.log"
+log_file = "runs/ratioNorm/train.log"
 
 epochs = []
 betas = []
