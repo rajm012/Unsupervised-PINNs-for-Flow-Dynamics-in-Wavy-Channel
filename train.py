@@ -29,6 +29,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import random
 
 # these are the correct constants used from the paper
 L = 8.0
@@ -382,6 +383,7 @@ def _train_impl(args, device, ckpt_dir, log_file):
     t0 = time.time()
     best_loss = float('inf')
     beta = args.beta 
+    lookback_buffer = []
 
     for epoch in range(1, args.epochs + 1):
         if args.batch_size and args.batch_size < xc.shape[0]:
@@ -399,9 +401,10 @@ def _train_impl(args, device, ckpt_dir, log_file):
             thermal_mode=args.thermal, w_thermal=w_thermal,
         )
 
-        # --- GradNorm Adaptive Beta Logic ---
-        if args.adaptive_beta:
-            with torch.no_grad():
+        # --- GradNorm or RatioNorm Adaptive Beta Logic ---
+        # if args.adaptive_beta:
+            # with torch.no_grad():
+                # -----------------------------------------------------------
                 # # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
                 # shared_params = list(model.net[-1].parameters())
                 # grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
@@ -428,10 +431,62 @@ def _train_impl(args, device, ckpt_dir, log_file):
                 # # 6. Clamp beta to a sensible range to prevent exploding values
                 # beta = max(args.beta_min, min(args.beta_max, beta))
                 # print(f"Beta for the epoch {epoch} is {beta}")
+                # -----------------------------------------------------------
+                # ratio = Lg / (LBC + 1e-8)
+                # beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
+                # beta = max(0.001, min(100.0, beta))
+                # print(f"Beta for the epoch {epoch} is {beta}")
+                # -----------------------------------------------------------
+
+        # --- ReLoBRaLo Adaptive Beta Logic ---
+        if args.relobralo:
+            with torch.no_grad():
+                 # Compute gradient norms of Lg and LBC w.r.t the last layer (to save compute)
+                shared_params = list(model.net[-1].parameters())
                 
-                ratio = Lg / (LBC + 1e-8)
-                beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
-                beta = max(0.001, min(100.0, beta))
+                grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
+                grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+                grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
+                grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
+                
+                eps = 1e-8
+                L_total = Lg + LBC
+                G_total = grad_norm_g + grad_norm_bc
+                
+                # 1. Calculate Ratios
+                loss_ratio_g = Lg / (L_total + eps)
+                loss_ratio_bc = LBC / (L_total + eps)
+                grad_ratio_g = grad_norm_g / (G_total + eps)
+                grad_ratio_bc = grad_norm_bc / (G_total + eps)
+                
+                # 2. Calculate Position Ratios
+                pos_ratio_g = loss_ratio_g / (grad_ratio_g + eps)
+                pos_ratio_bc = loss_ratio_bc / (grad_ratio_bc + eps)
+                
+                # 3. Calculate Temperature-scaled Softmax weights
+                exp_g = torch.exp(args.relobralo_tau * pos_ratio_g)
+                exp_bc = torch.exp(args.relobralo_tau * pos_ratio_bc)
+                
+                # 4. Target Beta derived from the softmax ratio
+                target_beta = (exp_bc / (exp_g + eps)).item()
+                
+                # 5. Apply Exponential Moving Average smoothing
+                new_beta = (1.0 - args.relobralo_smooth) * beta + args.relobralo_smooth * target_beta
+                
+                # 6. Random Lookback Logic
+                if len(lookback_buffer) > 0 and random.random() < args.relobralo_lookback_prob:
+                    # Look back into history: sample a random previous beta
+                    beta = random.choice(lookback_buffer)
+                else:
+                    # Standard update
+                    beta = new_beta
+                    # Append the new beta to the history buffer
+                    lookback_buffer.append(beta)
+                    if len(lookback_buffer) > args.relobralo_buffer_size:
+                        lookback_buffer.pop(0) # Remove the oldest value
+                
+                # 7. Clamp beta to ensure stability
+                beta = max(args.beta_min, min(args.beta_max, beta))
                 print(f"Beta for the epoch {epoch} is {beta}")
 
 
@@ -515,13 +570,24 @@ def build_argparser():
     p.add_argument("--device", type=str, default="cuda")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out_dir", type=str, default="runs/default")
+
     # p.add_argument("--adaptive_beta", action="store_true", help="Enable GradNorm adaptive weighting for beta")
     # p.add_argument("--gradnorm_alpha", type=float, default=0.5, help="GradNorm alpha. 0.5-1.0. Controls sensitivity to loss change rates.")
     # p.add_argument("--gradnorm_lr", type=float, default=0.05, help="EMA smoothing rate for updating beta in GradNorm. Default 0.05.")
     # p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
     # p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
-    p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
-    p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
+
+    # p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
+    # p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
+
+    p.add_argument("--relobralo", action="store_true", help="Enable ReLoBRaLo (Relative Loss Balancing with Random Lookback)")
+    p.add_argument("--relobralo_tau", type=float, default=1.0, help="Temperature parameter for ReLoBRaLo softmax. Lower = smoother.")
+    p.add_argument("--relobralo_smooth", type=float, default=0.05, help="EMA smoothing factor for beta updates in ReLoBRaLo.")
+    p.add_argument("--relobralo_lookback_prob", type=float, default=0.2, help="Probability (0-1) to use Random Lookback instead of updating beta.")
+    p.add_argument("--relobralo_buffer_size", type=int, default=500, help="Maximum history size for the lookback buffer.")
+    p.add_argument("--beta_min", type=float, default=0.001, help="Clamp minimum beta.")
+    p.add_argument("--beta_max", type=float, default=100.0, help="Clamp maximum beta.")
+
     return p
 
 
