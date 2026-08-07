@@ -19,6 +19,13 @@ pip install numpy pandas pytorch matplot scipy
 
 ## Folders and Files
 
+## Folder: testonly/adaptive_beta
+- `gradnorm`: Train the symmetric on using the adaptive beta following the gradient based beta optimization(try to balance the gradient of the both losses). Params for the alpha is `0.05`. *Code is commented in the train.py*.
+- `gradnorm_001`: Same as the above but params for the alpha is `0.001`.
+- `rationNorm`: On symmetric channel with ratio based optimization (tries to maintain the ratio of both loss) with params `beta_update_alpha` as `0.05`. *Code is commented in the train.py*.
+- `ratioNorm_001`: Same as the above but with params as `0.001`.
+
+
 ### Folder: eval_data
 
 - Holds the 8 csv files as `cfd_30.csv`, `cfd_60.csv`, `cfd_90.csv`, `cfd_180.csv`, `cfd_m30.csv`, `cfd_m60.csv`, `cfd_m90.csv`, `cfd_sym.csv`.

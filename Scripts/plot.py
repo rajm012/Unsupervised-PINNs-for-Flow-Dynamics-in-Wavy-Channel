@@ -2,7 +2,7 @@ import re
 import matplotlib.pyplot as plt
 
 # Path to your log file
-log_file = "runs/ratioNorm_001/train.log"
+log_file = "runs/relobralo/train.log"
 
 epochs = []
 betas = []
@@ -25,7 +25,7 @@ plt.figure(figsize=(10, 5))
 plt.plot(epochs, betas, linewidth=1.5)
 plt.xlabel("Epoch")
 plt.ylabel("Beta")
-plt.title("Ratio Norm(0.001) based Adaptive Beta vs Epoch")
+plt.title("Relobralo(1, 0.2) based Adaptive Beta vs Epoch")
 plt.grid(True, alpha=0.3)
 plt.xlim(1, 20000)
 plt.tight_layout()
