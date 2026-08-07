@@ -401,94 +401,94 @@ def _train_impl(args, device, ckpt_dir, log_file):
             thermal_mode=args.thermal, w_thermal=w_thermal,
         )
 
-        # --- GradNorm or RatioNorm Adaptive Beta Logic ---
-        if args.adaptive_beta:
-            with torch.no_grad():
-                # # -----------------------------------------------------------
-                # # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
-                # shared_params = list(model.net[-1].parameters())
-                # grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
-                # grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
-
-                # grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
-                # grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
-                
-                # # 2. Calculate average gradient norm and average loss
-                # avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
-                # avg_loss = (Lg.item() + LBC.item()) / 2.0
-                
-                # # 3. Calculate the Target Gradient Norm for the BC term
-                # # A higher alpha forces the gradients to match more strictly
-                # alpha = args.gradnorm_alpha
-                # target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
-                
-                # # 4. Compute the target beta required to achieve this gradient norm
-                # target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
-                
-                # # 5. Smoothly update beta via Exponential Moving Average (EMA)
-                # beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
-                
-                # # 6. Clamp beta to a sensible range to prevent exploding values
-                # beta = max(args.beta_min, min(args.beta_max, beta))
-                # print(f"Beta for the epoch {epoch} is {beta}")
-
-                # -----------------------------------------------------------
-                ratio = Lg / (LBC + 1e-8)
-                beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
-                beta = max(0.001, min(100.0, beta))
-                # -----------------------------------------------------------
-
-
-        # # --- ReLoBRaLo Adaptive Beta Logic ---
-        # if args.relobralo:
+        # # --- GradNorm or RatioNorm Adaptive Beta Logic ---
+        # if args.adaptive_beta:
         #     with torch.no_grad():
-        #          # Compute gradient norms of Lg and LBC w.r.t the last layer (to save compute)
-        #         shared_params = list(model.net[-1].parameters())
+        #         # # -----------------------------------------------------------
+        #         # # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
+        #         # shared_params = list(model.net[-1].parameters())
+        #         # grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
+        #         # grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+
+        #         # grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
+        #         # grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
                 
-        #         grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
-        #         grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
-        #         grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
-        #         grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
+        #         # # 2. Calculate average gradient norm and average loss
+        #         # avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
+        #         # avg_loss = (Lg.item() + LBC.item()) / 2.0
                 
-        #         eps = 1e-4
-        #         L_total = Lg + LBC
-        #         G_total = grad_norm_g + grad_norm_bc
+        #         # # 3. Calculate the Target Gradient Norm for the BC term
+        #         # # A higher alpha forces the gradients to match more strictly
+        #         # alpha = args.gradnorm_alpha
+        #         # target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
                 
-        #         # 1. Calculate Ratios
-        #         loss_ratio_g = Lg / (L_total + eps)
-        #         loss_ratio_bc = LBC / (L_total + eps)
-        #         grad_ratio_g = grad_norm_g / (G_total + eps)
-        #         grad_ratio_bc = grad_norm_bc / (G_total + eps)
+        #         # # 4. Compute the target beta required to achieve this gradient norm
+        #         # target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
                 
-        #         # 2. Calculate Position Ratios
-        #         pos_ratio_g = loss_ratio_g / (grad_ratio_g + eps)
-        #         pos_ratio_bc = loss_ratio_bc / (grad_ratio_bc + eps)
+        #         # # 5. Smoothly update beta via Exponential Moving Average (EMA)
+        #         # beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
                 
-        #         # 3. Calculate Temperature-scaled Softmax weights
-        #         exp_g = torch.exp(args.relobralo_tau * pos_ratio_g)
-        #         exp_bc = torch.exp(args.relobralo_tau * pos_ratio_bc)
+        #         # # 6. Clamp beta to a sensible range to prevent exploding values
+        #         # beta = max(args.beta_min, min(args.beta_max, beta))
+        #         # print(f"Beta for the epoch {epoch} is {beta}")
+
+        #         # -----------------------------------------------------------
+        #         ratio = Lg / (LBC + 1e-8)
+        #         beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
+        #         beta = max(0.001, min(100.0, beta))
+        #         # -----------------------------------------------------------
+
+
+        # --- ReLoBRaLo Adaptive Beta Logic ---
+        if args.relobralo:
+            with torch.no_grad():
+                 # Compute gradient norms of Lg and LBC w.r.t the last layer (to save compute)
+                shared_params = list(model.net[-1].parameters())
                 
-        #         # 4. Target Beta derived from the softmax ratio
-        #         target_beta = (exp_bc / (exp_g + eps)).item()
+                grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
+                grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+                grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
+                grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
                 
-        #         # 5. Apply Exponential Moving Average smoothing
-        #         new_beta = (1.0 - args.relobralo_smooth) * beta + args.relobralo_smooth * target_beta
+                eps = 1e-4
+                L_total = Lg + LBC
+                G_total = grad_norm_g + grad_norm_bc
                 
-        #         # 6. Random Lookback Logic
-        #         if len(lookback_buffer) > 0 and random.random() < args.relobralo_lookback_prob:
-        #             # Look back into history: sample a random previous beta
-        #             beta = random.choice(lookback_buffer)
-        #         else:
-        #             # Standard update
-        #             beta = new_beta
-        #             # Append the new beta to the history buffer
-        #             lookback_buffer.append(beta)
-        #             if len(lookback_buffer) > args.relobralo_buffer_size:
-        #                 lookback_buffer.pop(0) # Remove the oldest value
+                # 1. Calculate Ratios
+                loss_ratio_g = Lg / (L_total + eps)
+                loss_ratio_bc = LBC / (L_total + eps)
+                grad_ratio_g = grad_norm_g / (G_total + eps)
+                grad_ratio_bc = grad_norm_bc / (G_total + eps)
                 
-        #         # 7. Clamp beta to ensure stability
-        #         beta = max(args.beta_min, min(args.beta_max, beta))
-        #         print(f"Beta for the epoch {epoch} is {beta}")
+                # 2. Calculate Position Ratios
+                pos_ratio_g = loss_ratio_g / (grad_ratio_g + eps)
+                pos_ratio_bc = loss_ratio_bc / (grad_ratio_bc + eps)
+                
+                # 3. Calculate Temperature-scaled Softmax weights
+                exp_g = torch.exp(args.relobralo_tau * pos_ratio_g)
+                exp_bc = torch.exp(args.relobralo_tau * pos_ratio_bc)
+                
+                # 4. Target Beta derived from the softmax ratio
+                target_beta = (exp_bc / (exp_g + eps)).item()
+                
+                # 5. Apply Exponential Moving Average smoothing
+                new_beta = (1.0 - args.relobralo_smooth) * beta + args.relobralo_smooth * target_beta
+                
+                # 6. Random Lookback Logic
+                if len(lookback_buffer) > 0 and random.random() < args.relobralo_lookback_prob:
+                    # Look back into history: sample a random previous beta
+                    beta = random.choice(lookback_buffer)
+                else:
+                    # Standard update
+                    beta = new_beta
+                    # Append the new beta to the history buffer
+                    lookback_buffer.append(beta)
+                    if len(lookback_buffer) > args.relobralo_buffer_size:
+                        lookback_buffer.pop(0) # Remove the oldest value
+                
+                # 7. Clamp beta to ensure stability
+                beta = max(args.beta_min, min(args.beta_max, beta))
+
 
         print(f"Beta for the epoch {epoch} is {beta}")
         Lp = Lg + beta * LBC  # Eq. (27)
@@ -578,16 +578,16 @@ def build_argparser():
     # p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
     # p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
 
-    p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
-    p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
+    # p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
+    # p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
 
-    # p.add_argument("--relobralo", action="store_true", help="Enable ReLoBRaLo (Relative Loss Balancing with Random Lookback)")
-    # p.add_argument("--relobralo_tau", type=float, default=0.3, help="Temperature parameter for ReLoBRaLo softmax. Lower = smoother.")
-    # p.add_argument("--relobralo_smooth", type=float, default=0.05, help="EMA smoothing factor for beta updates in ReLoBRaLo.")
-    # p.add_argument("--relobralo_lookback_prob", type=float, default=0.2, help="Probability (0-1) to use Random Lookback instead of updating beta.")
-    # p.add_argument("--relobralo_buffer_size", type=int, default=500, help="Maximum history size for the lookback buffer.")
-    # p.add_argument("--beta_min", type=float, default=0.001, help="Clamp minimum beta.")
-    # p.add_argument("--beta_max", type=float, default=100.0, help="Clamp maximum beta.")
+    p.add_argument("--relobralo", action="store_true", help="Enable ReLoBRaLo (Relative Loss Balancing with Random Lookback)")
+    p.add_argument("--relobralo_tau", type=float, default=0.3, help="Temperature parameter for ReLoBRaLo softmax. Lower = smoother.")
+    p.add_argument("--relobralo_smooth", type=float, default=0.05, help="EMA smoothing factor for beta updates in ReLoBRaLo.")
+    p.add_argument("--relobralo_lookback_prob", type=float, default=0.2, help="Probability (0-1) to use Random Lookback instead of updating beta.")
+    p.add_argument("--relobralo_buffer_size", type=int, default=500, help="Maximum history size for the lookback buffer.")
+    p.add_argument("--beta_min", type=float, default=0.001, help="Clamp minimum beta.")
+    p.add_argument("--beta_max", type=float, default=100.0, help="Clamp maximum beta.")
 
     return p
 
