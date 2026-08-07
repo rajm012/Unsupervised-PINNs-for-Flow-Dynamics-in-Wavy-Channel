@@ -404,39 +404,39 @@ def _train_impl(args, device, ckpt_dir, log_file):
         # --- GradNorm or RatioNorm Adaptive Beta Logic ---
         if args.adaptive_beta:
             with torch.no_grad():
-                # -----------------------------------------------------------
-                # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
-                shared_params = list(model.net[-1].parameters())
-                grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
-                grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+                # # -----------------------------------------------------------
+                # # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
+                # shared_params = list(model.net[-1].parameters())
+                # grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
+                # grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
 
-                grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
-                grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
+                # grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
+                # grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
                 
-                # 2. Calculate average gradient norm and average loss
-                avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
-                avg_loss = (Lg.item() + LBC.item()) / 2.0
+                # # 2. Calculate average gradient norm and average loss
+                # avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
+                # avg_loss = (Lg.item() + LBC.item()) / 2.0
                 
-                # 3. Calculate the Target Gradient Norm for the BC term
-                # A higher alpha forces the gradients to match more strictly
-                alpha = args.gradnorm_alpha
-                target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
+                # # 3. Calculate the Target Gradient Norm for the BC term
+                # # A higher alpha forces the gradients to match more strictly
+                # alpha = args.gradnorm_alpha
+                # target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
                 
-                # 4. Compute the target beta required to achieve this gradient norm
-                target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
+                # # 4. Compute the target beta required to achieve this gradient norm
+                # target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
                 
-                # 5. Smoothly update beta via Exponential Moving Average (EMA)
-                beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
+                # # 5. Smoothly update beta via Exponential Moving Average (EMA)
+                # beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
                 
-                # 6. Clamp beta to a sensible range to prevent exploding values
-                beta = max(args.beta_min, min(args.beta_max, beta))
-                print(f"Beta for the epoch {epoch} is {beta}")
-
-                # -----------------------------------------------------------
-                # ratio = Lg / (LBC + 1e-8)
-                # beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
-                # beta = max(0.001, min(100.0, beta))
+                # # 6. Clamp beta to a sensible range to prevent exploding values
+                # beta = max(args.beta_min, min(args.beta_max, beta))
                 # print(f"Beta for the epoch {epoch} is {beta}")
+
+                # -----------------------------------------------------------
+                ratio = Lg / (LBC + 1e-8)
+                beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
+                beta = max(0.001, min(100.0, beta))
+                print(f"Beta for the epoch {epoch} is {beta}")
                 # -----------------------------------------------------------
 
 
@@ -573,14 +573,14 @@ def build_argparser():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out_dir", type=str, default="runs/default")
 
-    p.add_argument("--adaptive_beta", action="store_true", help="Enable GradNorm adaptive weighting for beta")
-    p.add_argument("--gradnorm_alpha", type=float, default=0.5, help="GradNorm alpha. 0.5-1.0. Controls sensitivity to loss change rates.")
-    p.add_argument("--gradnorm_lr", type=float, default=0.001, help="EMA smoothing rate for updating beta in GradNorm. Default 0.05.")
-    p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
-    p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
+    # p.add_argument("--adaptive_beta", action="store_true", help="Enable GradNorm adaptive weighting for beta")
+    # p.add_argument("--gradnorm_alpha", type=float, default=0.5, help="GradNorm alpha. 0.5-1.0. Controls sensitivity to loss change rates.")
+    # p.add_argument("--gradnorm_lr", type=float, default=0.001, help="EMA smoothing rate for updating beta in GradNorm. Default 0.05.")
+    # p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
+    # p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
 
-    # p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
-    # p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
+    p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
+    p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
 
     # p.add_argument("--relobralo", action="store_true", help="Enable ReLoBRaLo (Relative Loss Balancing with Random Lookback)")
     # p.add_argument("--relobralo_tau", type=float, default=0.3, help="Temperature parameter for ReLoBRaLo softmax. Lower = smoother.")
