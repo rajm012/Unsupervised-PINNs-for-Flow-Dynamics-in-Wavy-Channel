@@ -436,7 +436,6 @@ def _train_impl(args, device, ckpt_dir, log_file):
                 ratio = Lg / (LBC + 1e-8)
                 beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
                 beta = max(0.001, min(100.0, beta))
-                print(f"Beta for the epoch {epoch} is {beta}")
                 # -----------------------------------------------------------
 
 
@@ -491,7 +490,7 @@ def _train_impl(args, device, ckpt_dir, log_file):
         #         beta = max(args.beta_min, min(args.beta_max, beta))
         #         print(f"Beta for the epoch {epoch} is {beta}")
 
-
+        print(f"Beta for the epoch {epoch} is {beta}")
         Lp = Lg + beta * LBC  # Eq. (27)
         Lp_value = Lp.item()
 
