@@ -492,7 +492,7 @@ def _train_impl(args, device, ckpt_dir, log_file):
         #         print(f"Beta for the epoch {epoch} is {beta}")
 
 
-        Lp = Lg + args.beta * LBC  # Eq. (27)
+        Lp = Lg + beta * LBC  # Eq. (27)
         Lp_value = Lp.item()
 
         Lp.backward()
