@@ -14,8 +14,28 @@ Consumes exactly the dataset produced by dataUsedGen.py:
   data/<geom>/collocation.csv   columns: x, y, zone
   data/<geom>/boundary.csv      columns: x, y, nx, ny, type
 
+--- PERIODIC MODE (new) ---
+If your reference data was generated with a periodic flow condition (fixed
+pressure drop Delta_p from inlet to outlet, driving a fully-developed
+in-module flow, plus a pinned reference pressure point -- e.g. COMSOL's
+"Periodic Flow Condition" + "Pressure Point Constraint"), pass --periodic
+and --delta_p. This replaces the inlet-Dirichlet-velocity / outlet-Neumann
+/ outlet-p=0 boundary treatment with:
+  - u, v (and theta, if thermal != none) matched at paired inlet/outlet
+    points (periodicity)
+  - p(inlet) - p(outlet) = delta_p at those same paired points (imposed
+    pressure drop, NOT p=0 at outlet)
+  - p = 0 pinned at the two extreme-y inlet points (the two "left corner"
+    points), matching a two-point pressure constraint
+The interior governing-equation losses (Lg1..Lg5) are UNCHANGED -- the
+Navier-Stokes physics inside the domain doesn't care how the boundary was
+driven. Only the boundary loss changes.
+
 Smoke test:
     python train_pinn.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal homogeneous --epochs 50 --batch_size 500 --hidden_layers 3 --hidden_units 32 --log_every 10 --out_dir runs/smoke_test
+
+Smoke test (periodic):
+    python train_pinn.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal none --periodic --delta_p 13 --epochs 50 --batch_size 500 --hidden_layers 3 --hidden_units 32 --log_every 10 --out_dir runs/smoke_test_periodic
 """
 
 import argparse
@@ -29,7 +49,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
-import random
 
 # these are the correct constants used from the paper
 L = 8.0
@@ -107,6 +126,8 @@ def velocity_from_psi(model, x, y):
 
 # ========================================================================
 # 2. GOVERNING (COLLOCATION) LOSSES -- Eqs. (16)-(21)
+#    UNCHANGED for periodic mode: the interior PDEs don't know or care how
+#    the boundary is driven.
 # ========================================================================
 def governing_losses(model, xc, yc, Re, Pr, w_thermal=1.0):
     xc = xc.clone().requires_grad_(True)
@@ -162,7 +183,7 @@ def governing_losses(model, xc, yc, Re, Pr, w_thermal=1.0):
 
 
 # ========================================================================
-# 3. BOUNDARY LOSSES -- Eqs. (22)-(26)
+# 3. BOUNDARY LOSSES -- Eqs. (22)-(26)  (non-periodic / original mode)
 # ========================================================================
 def theta_wall_target_np(x_np, mode):
     """Wall temperature target theta_w(x). Eq. (34) for the non-homogeneous
@@ -182,6 +203,11 @@ def boundary_losses(model, xb, yb, nxb, nyb, is_inlet, is_wall, is_outlet,
                      theta_wall_target, Re, Pr, thermal_mode="homogeneous",
                      w_thermal=1.0):
     """
+    Original (non-periodic) boundary treatment: fixed inlet velocity,
+    zero-gradient outlet velocity, p=0 at outlet (Fig. 3). Use this when
+    your reference data was generated with a developing-flow / fixed-inlet
+    setup, NOT a periodic flow condition.
+
     is_inlet / is_wall / is_outlet: precomputed boolean torch tensors (same
     length as xb), built once from the `type` column -- see make_type_masks.
     theta_wall_target: precomputed tensor of theta_w(x) values for the wall
@@ -231,6 +257,116 @@ def boundary_losses(model, xb, yb, nxb, nyb, is_inlet, is_wall, is_outlet,
     LBC = Lu + Lv + Lp_bc + w_thermal * Ltheta
     parts = {
         "LBC_u": Lu.item(),  "LBC_v": Lv.item(), "LBC_p": Lp_bc.item(),
+        "LBC_theta": Ltheta.item() if torch.is_tensor(Ltheta) else Ltheta,
+    }
+    return LBC, parts
+
+
+# ========================================================================
+# 3b. PERIODIC BOUNDARY LOSSES (new) -- for pressure-drop-driven,
+#     module-to-module periodic reference data (COMSOL Periodic Flow
+#     Condition + Pressure Point Constraint).
+# ========================================================================
+def build_periodic_pairs(xb, yb, is_inlet, is_outlet):
+    """
+    Builds matched inlet<->outlet point pairs (by sorting each side on y and
+    truncating to the shorter of the two counts) for the periodicity loss,
+    plus the two extreme-y inlet points (top-left / bottom-left corners) to
+    use as the pinned-pressure reference points.
+
+    This assumes the wall geometry is genuinely periodic with period L
+    (y_top(x_min)==y_top(x_max), y_bottom(x_min)==y_bottom(x_max)), which it
+    should be if x_max-x_min equals exactly one wavelength -- if not, the
+    inlet/outlet cross-sections differ in shape and periodicity is not a
+    physically valid boundary condition in the first place.
+    """
+    xb_in, yb_in = xb[is_inlet], yb[is_inlet]
+    xb_out, yb_out = xb[is_outlet], yb[is_outlet]
+
+    order_in = torch.argsort(yb_in.squeeze(-1))
+    order_out = torch.argsort(yb_out.squeeze(-1))
+    n_pair = min(order_in.shape[0], order_out.shape[0])
+    order_in = order_in[:n_pair]
+    order_out = order_out[:n_pair]
+
+    xb_in_p, yb_in_p = xb_in[order_in], yb_in[order_in]
+    xb_out_p, yb_out_p = xb_out[order_out], yb_out[order_out]
+
+    max_y_mismatch = (yb_in_p - yb_out_p).abs().max().item()
+    if max_y_mismatch > 1e-3:
+        print(
+            f"[warning] inlet/outlet y-pairing mismatch up to {max_y_mismatch:.4f} "
+            "-- geometry may not be exactly periodic over [x_min, x_max], or "
+            "inlet/outlet point counts in boundary.csv differ. Periodicity loss "
+            "will still run, but double-check your wall formulas / regenerate "
+            "boundary.csv with equal inlet/outlet counts if this is large."
+        )
+
+    # pin points: the two extreme-y inlet points (top-left, bottom-left corners),
+    # matching "two corner points on the left" pressure-point constraint.
+    y_in_flat = yb_in.squeeze(-1)
+    idx_min = torch.argmin(y_in_flat).view(1)
+    idx_max = torch.argmax(y_in_flat).view(1)
+    pin_idx = torch.cat([idx_min, idx_max])
+    xb_pin, yb_pin = xb_in[pin_idx], yb_in[pin_idx]
+
+    return xb_in_p, yb_in_p, xb_out_p, yb_out_p, xb_pin, yb_pin
+
+
+def periodic_boundary_losses(model, xb_wall, yb_wall, theta_wall_target,
+                              xb_in, yb_in, xb_out, yb_out,
+                              xb_pin, yb_pin, delta_p,
+                              thermal_mode="none", w_thermal=0.0):
+    """
+    Periodic hydrodynamic boundary treatment:
+      - walls: no-slip Dirichlet (u=v=0), theta Dirichlet if thermal != none
+      - inlet<->outlet pairs: u, v matched (periodicity); p differs by
+        exactly delta_p (p_inlet - p_outlet = delta_p, i.e. pressure drops
+        by delta_p across the module in the flow direction)
+      - one pinned point (or two, matching a two-point constraint) fixes
+        the otherwise-arbitrary additive pressure constant
+
+    NOTE on theta: this pairs theta_inlet == theta_outlet, i.e. treats
+    temperature as periodic module-to-module. That's only physically valid
+    if there's no net heat addition per module. If you're driving a genuine
+    periodically-developing THERMAL case (net heating per module), theta
+    needs the same drop/decomposition treatment as pressure -- don't combine
+    --periodic with --thermal nonhomogeneous without addressing that first.
+    """
+    # ---- walls: no-slip (+ theta target) ----
+    xb_w = xb_wall.clone().requires_grad_(True)
+    yb_w = yb_wall.clone().requires_grad_(True)
+    u_w, v_w, p_w, sxx_w, sxy_w, syy_w, theta_w = velocity_from_psi(model, xb_w, yb_w)
+    Lu = _mse(u_w - 0.0)
+    Lv = _mse(v_w - 0.0)
+
+    # ---- periodicity: matched inlet/outlet pairs ----
+    xb_i = xb_in.clone().requires_grad_(True)
+    yb_i = yb_in.clone().requires_grad_(True)
+    xb_o = xb_out.clone().requires_grad_(True)
+    yb_o = yb_out.clone().requires_grad_(True)
+    u_i, v_i, p_i, sxx_i, sxy_i, syy_i, theta_i = velocity_from_psi(model, xb_i, yb_i)
+    u_o, v_o, p_o, sxx_o, sxy_o, syy_o, theta_o = velocity_from_psi(model, xb_o, yb_o)
+
+    Lu = Lu + _mse(u_i - u_o)
+    Lv = Lv + _mse(v_i - v_o)
+
+    # ---- pressure: fixed drop across the module (NOT p=0 at outlet) ----
+    Lp_bc = _mse((p_i - p_o) - delta_p)
+
+    # ---- point pin(s): fix the arbitrary additive pressure constant ----
+    # pure value match -- no derivative needed, so a plain forward pass is enough.
+    _, p_pin, _, _, _, _ = model(xb_pin, yb_pin)
+    Lp_bc = Lp_bc + _mse(p_pin - 0.0)
+
+    if thermal_mode == "none":
+        Ltheta = torch.zeros((), device=xb_wall.device)
+    else:
+        Ltheta = _mse(theta_w - theta_wall_target) + _mse(theta_i - theta_o)
+
+    LBC = Lu + Lv + Lp_bc + w_thermal * Ltheta
+    parts = {
+        "LBC_u": Lu.item(), "LBC_v": Lv.item(), "LBC_p": Lp_bc.item(),
         "LBC_theta": Ltheta.item() if torch.is_tensor(Ltheta) else Ltheta,
     }
     return LBC, parts
@@ -340,6 +476,15 @@ def train(args):
     if args.device == "cuda" and device.type == "cpu":
         fallback_warning = "[warning] CUDA requested but not available -- falling back to CPU."
 
+    if args.periodic and args.delta_p is None:
+        raise ValueError("--periodic requires --delta_p (the imposed pressure drop, "
+                          "matching the Delta_p you set in the CFD Periodic Flow Condition).")
+    if args.periodic and args.thermal == "nonhomogeneous":
+        print("[warning] --periodic with --thermal nonhomogeneous: theta is being treated "
+              "as periodic module-to-module (theta_inlet == theta_outlet), which is only "
+              "valid if there's no net heat addition per module. Double-check this matches "
+              "your CFD thermal setup before trusting these results.")
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -379,11 +524,16 @@ def _train_impl(args, device, ckpt_dir, log_file):
     xb, yb, nxb, nyb = data["xb"], data["yb"], data["nxb"], data["nyb"]
     w_thermal = 1.0 if args.thermal != "none" else 0.0
 
+    if args.periodic:
+        print(f"Periodic mode: delta_p={args.delta_p}")
+        xb_wall, yb_wall = xb[is_wall], yb[is_wall]
+        xb_in_p, yb_in_p, xb_out_p, yb_out_p, xb_pin, yb_pin = build_periodic_pairs(
+            xb, yb, is_inlet, is_outlet
+        )
+        theta_wall_target_periodic = theta_wall_target  # same precomputed tensor, still keyed to is_wall order
+
     history = []
     t0 = time.time()
-    best_loss = float('inf')
-    beta = args.beta 
-    lookback_buffer = []
 
     for epoch in range(1, args.epochs + 1):
         if args.batch_size and args.batch_size < xc.shape[0]:
@@ -395,113 +545,25 @@ def _train_impl(args, device, ckpt_dir, log_file):
         optimizer.zero_grad()
 
         Lg, g_parts = governing_losses(model, xc_b, yc_b, args.Re, args.Pr, w_thermal=w_thermal)
-        LBC, b_parts = boundary_losses(
-            model, xb, yb, nxb, nyb, is_inlet, is_wall, is_outlet,
-            theta_wall_target, args.Re, args.Pr,
-            thermal_mode=args.thermal, w_thermal=w_thermal,
-        )
 
-        # # --- GradNorm or RatioNorm Adaptive Beta Logic ---
-        # if args.adaptive_beta:
-        #     with torch.no_grad():
-        #         # # -----------------------------------------------------------
-        #         # # 1. Compute Gradient Norms w.r.t the shared weights (using last layer to save compute)
-        #         # shared_params = list(model.net[-1].parameters())
-        #         # grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
-        #         # grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
+        if args.periodic:
+            LBC, b_parts = periodic_boundary_losses(
+                model, xb_wall, yb_wall, theta_wall_target_periodic,
+                xb_in_p, yb_in_p, xb_out_p, yb_out_p, xb_pin, yb_pin,
+                args.delta_p, thermal_mode=args.thermal, w_thermal=w_thermal,
+            )
+        else:
+            LBC, b_parts = boundary_losses(
+                model, xb, yb, nxb, nyb, is_inlet, is_wall, is_outlet,
+                theta_wall_target, args.Re, args.Pr,
+                thermal_mode=args.thermal, w_thermal=w_thermal,
+            )
 
-        #         # grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
-        #         # grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
-                
-        #         # # 2. Calculate average gradient norm and average loss
-        #         # avg_grad = (grad_norm_g + grad_norm_bc) / 2.0
-        #         # avg_loss = (Lg.item() + LBC.item()) / 2.0
-                
-        #         # # 3. Calculate the Target Gradient Norm for the BC term
-        #         # # A higher alpha forces the gradients to match more strictly
-        #         # alpha = args.gradnorm_alpha
-        #         # target_grad_bc = avg_grad * (LBC.item() / (avg_loss + 1e-8)) ** alpha
-                
-        #         # # 4. Compute the target beta required to achieve this gradient norm
-        #         # target_beta = target_grad_bc / (grad_norm_bc + 1e-8)
-                
-        #         # # 5. Smoothly update beta via Exponential Moving Average (EMA)
-        #         # beta = (1.0 - args.gradnorm_lr) * beta + args.gradnorm_lr * target_beta
-                
-        #         # # 6. Clamp beta to a sensible range to prevent exploding values
-        #         # beta = max(args.beta_min, min(args.beta_max, beta))
-        #         # print(f"Beta for the epoch {epoch} is {beta}")
-
-        #         # -----------------------------------------------------------
-        #         ratio = Lg / (LBC + 1e-8)
-        #         beta = (1.0 - args.beta_update_alpha) * beta + args.beta_update_alpha * ratio
-        #         beta = max(0.001, min(100.0, beta))
-        #         # -----------------------------------------------------------
-
-
-        # --- ReLoBRaLo Adaptive Beta Logic ---
-        if args.relobralo:
-            with torch.no_grad():
-                 # Compute gradient norms of Lg and LBC w.r.t the last layer (to save compute)
-                shared_params = list(model.net[-1].parameters())
-                
-                grads_g = torch.autograd.grad(Lg, shared_params, retain_graph=True)
-                grad_norm_g = torch.norm(torch.cat([g.view(-1) for g in grads_g]), p=2)
-                grads_bc = torch.autograd.grad(LBC, shared_params, retain_graph=True)
-                grad_norm_bc = torch.norm(torch.cat([g.view(-1) for g in grads_bc]), p=2)
-                
-                eps = 1e-4
-                L_total = Lg + LBC
-                G_total = grad_norm_g + grad_norm_bc
-                
-                # 1. Calculate Ratios
-                loss_ratio_g = Lg / (L_total + eps)
-                loss_ratio_bc = LBC / (L_total + eps)
-                grad_ratio_g = grad_norm_g / (G_total + eps)
-                grad_ratio_bc = grad_norm_bc / (G_total + eps)
-                
-                # 2. Calculate Position Ratios
-                pos_ratio_g = loss_ratio_g / (grad_ratio_g + eps)
-                pos_ratio_bc = loss_ratio_bc / (grad_ratio_bc + eps)
-                
-                # 3. Calculate Temperature-scaled Softmax weights
-                exp_g = torch.exp(args.relobralo_tau * pos_ratio_g)
-                exp_bc = torch.exp(args.relobralo_tau * pos_ratio_bc)
-                
-                # 4. Target Beta derived from the softmax ratio
-                target_beta = (exp_bc / (exp_g + eps)).item()
-                
-                # 5. Apply Exponential Moving Average smoothing
-                new_beta = (1.0 - args.relobralo_smooth) * beta + args.relobralo_smooth * target_beta
-                
-                # 6. Random Lookback Logic
-                if len(lookback_buffer) > 0 and random.random() < args.relobralo_lookback_prob:
-                    # Look back into history: sample a random previous beta
-                    beta = random.choice(lookback_buffer)
-                else:
-                    # Standard update
-                    beta = new_beta
-                    # Append the new beta to the history buffer
-                    lookback_buffer.append(beta)
-                    if len(lookback_buffer) > args.relobralo_buffer_size:
-                        lookback_buffer.pop(0) # Remove the oldest value
-                
-                # 7. Clamp beta to ensure stability
-                beta = max(args.beta_min, min(args.beta_max, beta))
-
-
-        print(f"Beta for the epoch {epoch} is {beta}")
-        Lp = Lg + beta * LBC  # Eq. (27)
-        Lp_value = Lp.item()
+        Lp = Lg + args.beta * LBC  # Eq. (27)
 
         Lp.backward()
         optimizer.step()
-        scheduler.step(Lp_value)
-        
-        if Lp_value < best_loss:
-            best_loss = Lp_value
-            torch.save(model.state_dict(), os.path.join(args.out_dir, f'model_best.pt'))
-            print(f"[{epoch:6d}] New best model! with Loss= {best_loss:.4e}")
+        scheduler.step(Lp.item())
 
         if epoch % args.log_every == 0 or epoch == 1:
             row = {
@@ -556,14 +618,16 @@ def build_argparser():
     p.add_argument("--geom_dir", type=str, required=True, help="Path to one geometry folder, e.g. data/phi_60")
     p.add_argument("--Re", type=float, required=True, help="Reynolds number")
     p.add_argument("--Pr", type=float, default=0.7, help="Prandtl number")
-    p.add_argument("--thermal", type=str, default="homogeneous", choices=["none", "homogeneous", "nonhomogeneous"], help="Thermal BC mode (Sec. V.B.1 / V.B.2, or 'none' for hydrodynamics-only)")
+    p.add_argument("--thermal", type=str, default="none",
+                    choices=["none", "homogeneous", "nonhomogeneous"],
+                    help="Thermal BC mode (Sec. V.B.1 / V.B.2, or 'none' for hydrodynamics-only)")
     p.add_argument("--hidden_layers", type=int, default=6, help="Table I: 6 for wavy, 5 for plane")
     p.add_argument("--hidden_units", type=int, default=100, help="Table I: 100 for wavy, 80 for plane")
     p.add_argument("--beta", type=float, default=10.0, help="Boundary-loss weight (Eq. 27)")
     p.add_argument("--epochs", type=int, default=20000)
-    p.add_argument("--batch_size", type=int, default=16384, help="0 = full-batch (as in the paper)")
+    p.add_argument("--batch_size", type=int, default=0, help="0 = full-batch (as in the paper)")
     p.add_argument("--lr0", type=float, default=1e-3)
-    p.add_argument("--lr_patience", type=int, default=300)
+    p.add_argument("--lr_patience", type=int, default=2000)
     p.add_argument("--lr_gamma", type=float, default=0.8)
     p.add_argument("--lr_min", type=float, default=1e-6)
     p.add_argument("--log_every", type=int, default=10)
@@ -571,28 +635,20 @@ def build_argparser():
     p.add_argument("--device", type=str, default="cuda")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out_dir", type=str, default="runs/default")
-
-    # p.add_argument("--adaptive_beta", action="store_true", help="Enable GradNorm adaptive weighting for beta")
-    # p.add_argument("--gradnorm_alpha", type=float, default=0.5, help="GradNorm alpha. 0.5-1.0. Controls sensitivity to loss change rates.")
-    # p.add_argument("--gradnorm_lr", type=float, default=0.001, help="EMA smoothing rate for updating beta in GradNorm. Default 0.05.")
-    # p.add_argument("--beta_min", type=float, default=0.01, help="Minimum possible value for adaptive beta (clamping).")
-    # p.add_argument("--beta_max", type=float, default=100.0, help="Maximum possible value for adaptive beta (clamping).")
-
-    # p.add_argument("--adaptive_beta", action="store_true", help="Enable adaptive weighting for beta (Loss-Ratio balancing)")
-    # p.add_argument("--beta_update_alpha", type=float, default=0.05,help="Smoothing factor for beta EMA. Smaller = more stable (default: 0.05)")
-
-    p.add_argument("--relobralo", action="store_true", help="Enable ReLoBRaLo (Relative Loss Balancing with Random Lookback)")
-    p.add_argument("--relobralo_tau", type=float, default=0.3, help="Temperature parameter for ReLoBRaLo softmax. Lower = smoother.")
-    p.add_argument("--relobralo_smooth", type=float, default=0.05, help="EMA smoothing factor for beta updates in ReLoBRaLo.")
-    p.add_argument("--relobralo_lookback_prob", type=float, default=0.2, help="Probability (0-1) to use Random Lookback instead of updating beta.")
-    p.add_argument("--relobralo_buffer_size", type=int, default=500, help="Maximum history size for the lookback buffer.")
-    p.add_argument("--beta_min", type=float, default=0.001, help="Clamp minimum beta.")
-    p.add_argument("--beta_max", type=float, default=100.0, help="Clamp maximum beta.")
-
+    p.add_argument("--periodic", action="store_true",
+                    help="Use periodic (pressure-drop-driven) boundary conditions instead of "
+                         "fixed-inlet-velocity ones -- matches a COMSOL Periodic Flow Condition "
+                         "+ Pressure Point Constraint reference dataset.")
+    p.add_argument("--delta_p", type=float, default=None,
+                    help="Imposed pressure drop inlet->outlet (required if --periodic). Must "
+                         "correspond to the SAME physical flow as --Re -- these are coupled, "
+                         "not independent choices.")
     return p
+
 
 
 if __name__ == "__main__":
     args = build_argparser().parse_args()
     train(args)
+
 
