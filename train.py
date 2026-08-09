@@ -35,7 +35,7 @@ Smoke test:
     python train_pinn.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal homogeneous --epochs 50 --batch_size 500 --hidden_layers 3 --hidden_units 32 --log_every 10 --out_dir runs/smoke_test
 
 Smoke test (periodic):
-    python train_pinn.py --geom_dir data/sym --Re 10 --Pr 0.7 --thermal none --periodic --delta_p 13 --epochs 50 --batch_size 500 --hidden_layers 3 --hidden_units 32 --log_every 10 --out_dir runs/smoke_test_periodic
+    python train.py --geom_dir points/sym --Re 10 --Pr 0.7 --thermal none --periodic --delta_p 13 --out_dir runs/periodic
 """
 
 import argparse
@@ -618,16 +618,15 @@ def build_argparser():
     p.add_argument("--geom_dir", type=str, required=True, help="Path to one geometry folder, e.g. data/phi_60")
     p.add_argument("--Re", type=float, required=True, help="Reynolds number")
     p.add_argument("--Pr", type=float, default=0.7, help="Prandtl number")
-    p.add_argument("--thermal", type=str, default="none",
-                    choices=["none", "homogeneous", "nonhomogeneous"],
+    p.add_argument("--thermal", type=str, default="none", choices=["none", "homogeneous", "nonhomogeneous"],
                     help="Thermal BC mode (Sec. V.B.1 / V.B.2, or 'none' for hydrodynamics-only)")
     p.add_argument("--hidden_layers", type=int, default=6, help="Table I: 6 for wavy, 5 for plane")
     p.add_argument("--hidden_units", type=int, default=100, help="Table I: 100 for wavy, 80 for plane")
-    p.add_argument("--beta", type=float, default=10.0, help="Boundary-loss weight (Eq. 27)")
+    p.add_argument("--beta", type=float, default=1.0, help="Boundary-loss weight (Eq. 27)")
     p.add_argument("--epochs", type=int, default=20000)
-    p.add_argument("--batch_size", type=int, default=0, help="0 = full-batch (as in the paper)")
+    p.add_argument("--batch_size", type=int, default=16384, help="0 = full-batch (as in the paper)")
     p.add_argument("--lr0", type=float, default=1e-3)
-    p.add_argument("--lr_patience", type=int, default=2000)
+    p.add_argument("--lr_patience", type=int, default=300)
     p.add_argument("--lr_gamma", type=float, default=0.8)
     p.add_argument("--lr_min", type=float, default=1e-6)
     p.add_argument("--log_every", type=int, default=10)
